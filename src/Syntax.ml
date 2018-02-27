@@ -95,6 +95,7 @@ module Stmt =
       | (st, i, o), Write exp -> (st, i, o@[Expr.eval st exp])
       | (st, i, o), Assign (var, exp) -> (Expr.update var (Expr.eval st exp) st, i, o)
       | _, Seq (stmt_f, stmt_s) -> eval (eval conf stmt_f) stmt_s
+      | _, _ -> failwith (Printf.sprintf "Undefined statement")
                                                          
   end
 

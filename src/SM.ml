@@ -17,13 +17,53 @@ type prg = insn list
  *)
 type config = int list * Syntax.Stmt.config
 
+let int_of_bool b = if b then 1 else 0
+let bool_of_int i = i != 0
+
+(* Binop interpreter
+    val eval_binop : string -> int -> int -> int
+*)
+
+let rec eval_binop op v1 v2 = 
+  match op with
+  | "+" -> v1 + v2
+  | "-" -> v1 - v2
+  | "*" -> v1 * v2
+  | "/" -> v1 / v2
+  | "%" -> v1 mod v2
+  | "==" -> int_of_bool (v1 == v2) 
+  | "!=" -> int_of_bool (v1 != v2) 
+  | "<=" -> int_of_bool (v1 <= v2) 
+  | "<" ->  int_of_bool (v1 < v2) 
+  | ">=" -> int_of_bool (v1 >= v2) 
+  | ">" -> int_of_bool (v1 > v2) 
+  | "!!" -> int_of_bool ((bool_of_int v1) || (bool_of_int v2)) 
+  | "&&" -> int_of_bool ((bool_of_int v1) && (bool_of_int v2)) 
+  | _ -> failwith (Printf.sprintf "Undefined operator %s" op)
+
+(* Instruction interpreter
+    val eval_insn : config -> insn -> config
+*)
+
+let rec eval_insn conf inst =
+  match conf, inst with
+  | (y::x::stk, st_cf), BINOP op -> ((eval_binop op x y)::stk, st_cf)
+  | (stk, st_cf), CONST c -> (c::stk, st_cf)
+  | (stk, (st, el::i, o)), READ -> (el::stk, (st, i, o))
+  | (el::stk, (st, i, o)), WRITE -> (stk, (st, i, o@[el]))
+  | (stk, (st, i, o)), LD var -> ((st var)::stk, (st, i, o))
+  | (el::stk, (st, i, o)), ST var -> (stk, (Syntax.Expr.update var el st, i, o))
+
 (* Stack machine interpreter
 
      val eval : config -> prg -> config
 
    Takes a configuration and a program, and returns a configuration as a result
  *)                         
-let eval _ = failwith "Not yet implemented"
+let rec eval conf prog =
+  match prog with
+  | [] -> conf
+  | (ins::prgm) -> eval (eval_insn conf ins) prgm
 
 (* Top-level evaluation
 
@@ -33,6 +73,17 @@ let eval _ = failwith "Not yet implemented"
 *)
 let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
 
+(* 
+   val compile_expr : Syntax.Expr.t -> prg
+ *)
+
+let rec compile_expr expr =
+  match expr with
+  | Syntax.Expr.Const c -> [CONST c]
+  | Syntax.Expr.Var v -> [LD v]
+  | Syntax.Expr.Binop (op, exp1, exp2) -> compile_expr exp1 @ compile_expr exp2 @ [BINOP op]
+
+
 (* Stack machine compiler
 
      val compile : Syntax.Stmt.t -> prg
@@ -41,4 +92,9 @@ let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
    stack machine
  *)
 
-let compile _ = failwith "Not yet implemented"
+let rec compile stmt =
+  match stmt with
+  | Syntax.Stmt.Read var -> [READ; ST var]
+  | Syntax.Stmt.Write expr -> compile_expr expr @ [WRITE]
+  | Syntax.Stmt.Assign (var, expr) -> compile_expr expr @ [ST var]
+  | Syntax.Stmt.Seq (st1, st2) -> compile st1 @ compile st2
