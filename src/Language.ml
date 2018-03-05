@@ -44,7 +44,32 @@ module Expr =
        Takes a state and an expression, and returns the value of the expression in 
        the given state.
     *)
-    let eval _ = failwith "Not implemented yet"
+    let int_of_bool b = if b then 1 else 0
+    let bool_of_int i = i != 0
+  
+    let rec eval st e = 
+      match e with
+    | Const c -> c
+    | Var v -> st v
+    | Binop (op, ex1, ex2) ->
+        let v1 = eval st ex1 in
+        let v2 = eval st ex2 in
+        match op with
+        | "+" -> v1 + v2
+        | "-" -> v1 - v2
+        | "*" -> v1 * v2
+        | "/" -> v1 / v2
+        | "%" -> v1 mod v2
+        | "==" -> int_of_bool (v1 == v2) 
+        | "!=" -> int_of_bool (v1 != v2) 
+        | "<=" -> int_of_bool (v1 <= v2) 
+        | "<" ->  int_of_bool (v1 < v2) 
+        | ">=" -> int_of_bool (v1 >= v2) 
+        | ">" -> int_of_bool (v1 > v2) 
+        | "!!" -> int_of_bool ((bool_of_int v1) || (bool_of_int v2)) 
+        | "&&" -> int_of_bool ((bool_of_int v1) && (bool_of_int v2)) 
+        | _ -> failwith (Printf.sprintf "Undefined operator %s" op)
+
 
     (* Expression parser. You can use the following terminals:
 
@@ -53,7 +78,27 @@ module Expr =
    
     *)
     ostap (
-      parse: empty {failwith "Not implemented yet"}
+      parse: 
+        !(Ostap.Util.expr
+            (fun x -> x)
+            [|
+              `Lefta , [ostap ("!!"), (fun x y -> Binop ("!!", x, y))];
+
+              `Lefta , [ostap ("&&"), (fun x y -> Binop ("&&", x, y))];
+
+              `Nona  , [ostap (">="), (fun x y -> Binop (">=", x, y)); ostap (">"), (fun x y -> Binop (">", x, y)); 
+                        ostap ("<="), (fun x y -> Binop ("<=", x, y)); ostap ("<"), (fun x y -> Binop ("<", x, y)); 
+                        ostap ("=="), (fun x y -> Binop ("==", x, y)); ostap ("!="), (fun x y -> Binop ("!=", x, y))];
+
+              `Lefta , [ostap ("+"), (fun x y -> Binop ("+", x, y)); ostap ("-"), (fun x y -> Binop ("-", x, y))];
+
+              `Lefta , [ostap ("*"), (fun x y -> Binop ("*", x, y)); ostap ("/"), (fun x y -> Binop ("/", x, y));
+                        ostap ("%"), (fun x y -> Binop ("%", x, y))];
+            |]
+            primary
+          );
+
+      primary: x:IDENT {Var x} | n:DECIMAL {Const n} | -"(" parse -")"
     )
 
   end
@@ -78,11 +123,28 @@ module Stmt =
 
        Takes a configuration and a statement, and returns another configuration
     *)
-    let eval _ = failwith "Not implemented yet"
+    let rec eval conf stmt = 
+      match conf, stmt with
+      | (st, el::i, o), Read var -> (Expr.update var el st, i, o)
+      | (st, i, o), Write exp -> (st, i, o@[Expr.eval st exp])
+      | (st, i, o), Assign (var, exp) -> (Expr.update var (Expr.eval st exp) st, i, o)
+      | _, Seq (stmt_f, stmt_s) -> eval (eval conf stmt_f) stmt_s
+      | _, _ -> failwith (Printf.sprintf "Undefined statement")
 
     (* Statement parser *)
     ostap (
-      parse: empty {failwith "Not implemented yet"}
+      parse: 
+        !(Ostap.Util.expr
+            (fun x -> x)
+            [|
+              `Righta , [ostap (";"), (fun x y -> Seq (x, y))];
+            |]
+            primary
+          );
+
+      primary: -"read" -"(" x:IDENT -")" {Read x} 
+             | -"write" -"(" r:!(Expr.parse) -")" {Write r} 
+             | x:IDENT -":=" r:!(Expr.parse) {Assign (x, r)}
     )
       
   end
