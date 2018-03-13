@@ -73,6 +73,33 @@ let show instr =
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
 
+let rec log_suffix op =
+  match op with
+  | ">=" -> "ge"
+  | ">" -> "g"
+  | "<=" -> "le"
+  | "<" -> "l"
+  | "==" -> "e"
+  | "!=" -> "ne"
+  | _ -> failwith "Unknown logical operator"
+
+let rec compile_binop env op =
+  let x, y, env = env#pop2 in
+  let s, env = env#allocate in
+    match op with
+    | "+" | "*" | "-" -> 
+      env, [Mov (y, eax); Binop (op, x, eax); Mov (eax, s)]
+    | ">=" | ">" |  "<=" | "<" | "==" | "!=" ->
+      env, [Binop ("^", edx, edx); Mov (y, eax); Binop ("cmp", x, eax); Set (log_suffix op, "%dl"); Mov (edx, s)]
+    | "/" ->
+      env, [Mov (y, eax); Cltd; IDiv x; Mov (eax, s)]  
+    | "%" ->
+      env, [Mov (y, eax); Cltd; IDiv x; Mov (edx, s)] 
+    | "!!" | "&&" ->
+      env, [Binop ("^", eax, eax); Binop ("^", edx, edx); Binop ("cmp", L 0, y); Set ("nz", "%al");
+            Binop ("cmp", L 0, x); Set ("nz", "%dl"); Binop (op, eax, edx); Mov (edx, s)]
+    | _ -> failwith "Not yet supported"
+
 (* Symbolic stack machine evaluator
 
      compile : env -> prg -> env * instr list
@@ -80,7 +107,31 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile env code = failwith "Not yet implemented"
+let rec compile env = function
+| [] -> env, []
+| instr :: code ->
+  let env, asm = 
+    match instr with
+    | CONST n -> 
+      let s, env = env#allocate in
+      env, [Mov (L n, s)]
+    | WRITE ->
+      let s, env = env#pop in
+      env, [Push s; Call "Lwrite"; Pop eax]
+    | READ ->
+      let s, env = env#allocate in
+      env, [Call "Lread"; Mov (eax, s)]
+    | LD x ->
+      let s, env = (env#global x)#allocate in
+      env, [Mov (M ("global_" ^ x), s)]
+    | ST x ->
+      let s, env = (env#global x)#pop in
+      env, [Mov (s, M ("global_" ^ x))]
+    | BINOP op -> compile_binop env op
+    | _ -> failwith "Not yet supported"
+  in
+  let env, rAsm = compile env code in
+  env, asm @ rAsm
 
 (* A set of strings *)           
 module S = Set.Make (String)
