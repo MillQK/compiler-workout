@@ -207,8 +207,8 @@ let genasm prog =
     )
     env#globals;
   Buffer.add_string asm "\t.text\n";
-  Buffer.add_string asm "\t.globl\t_main\n";
-  Buffer.add_string asm "_main:\n";
+  Buffer.add_string asm "\t.globl\tmain\n";
+  Buffer.add_string asm "main:\n";
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
     code;
