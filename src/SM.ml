@@ -59,13 +59,13 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     in
     let stt, stk = fun_init_state (State.enter st (args @ locals)) (args, stack) in
     eval env (cstack, stk, (stt, i, o)) prg'
+  | CALL (f_name, _, _) -> (
+    eval env ((prg', st)::cstack, stack, c) (env#labeled f_name)
+    )
   | END | RET _ -> (
     match cstack with
     | (p, stt)::cstack' -> eval env (cstack', stack, (State.leave st stt, i, o)) p
     | [] -> conf
-    )
-  | CALL (f_name, _, _) -> (
-    eval env ((prg', st)::cstack, stack, c) (env#labeled f_name)
     )
   )
 
@@ -103,7 +103,7 @@ let rec compile_expr = function
 | Expr.Var   x          -> [LD x]
 | Expr.Const n          -> [CONST n]
 | Expr.Binop (op, x, y) -> (compile_expr x) @ (compile_expr y) @ [BINOP op]
-| Expr.Call (f_name, args) -> List.concat (List.map compile_expr args) @ [CALL ("L" ^ f_name, List.length args, false)]
+| Expr.Call (f_name, args) -> List.concat (List.map compile_expr args) @ [CALL (f_name, List.length args, false)]
 
 let rec compile_stmt = function
 | Stmt.Seq (s1, s2)  -> (compile_stmt s1) @ (compile_stmt s2)
@@ -132,12 +132,12 @@ let rec compile_stmt = function
 | Stmt.Call (f_name, args) -> (
   let list_compiled_args = List.map compile_expr (List.rev args) in
   let compiled_args = List.concat list_compiled_args in
-  compiled_args @ [CALL ("L" ^ f_name, List.length args, true)]
+  compiled_args @ [CALL (f_name, List.length args, true)]
 )
 | Stmt.Return m_v -> (match m_v with Some v -> (compile_expr v) | None -> []) @ [RET (m_v <> None)]
 
 let rec compile_def (f_name, (f_args, f_locals, f_body)) = 
 [LABEL (f_name); BEGIN (f_name, f_args, f_locals)] @ compile_stmt f_body @ [END]
 
-let rec compile (defs, p) = [LABEL "main"] @ compile_stmt p @ [END] @ List.concat (List.map compile_def defs)
+let rec compile (defs, p) = [LABEL "Lmain"] @ compile_stmt p @ [END] @ List.concat (List.map compile_def defs)
 

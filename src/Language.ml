@@ -116,16 +116,16 @@ module Expr =
     ostap (                                      
       parse:
 	  !(Ostap.Util.expr 
-             (fun x -> x)
-	     (Array.map (fun (a, s) -> a, 
-                           List.map  (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
+              (fun x -> x)
+	            (Array.map (fun (a, s) -> a, 
+              List.map  (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
                         ) 
               [|                
-		`Lefta, ["!!"];
-		`Lefta, ["&&"];
-		`Nona , ["=="; "!="; "<="; "<"; ">="; ">"];
-		`Lefta, ["+" ; "-"];
-		`Lefta, ["*" ; "/"; "%"];
+              `Lefta, ["!!"];
+              `Lefta, ["&&"];
+              `Nona , ["=="; "!="; "<="; "<"; ">="; ">"];
+              `Lefta, ["+" ; "-"];
+              `Lefta, ["*" ; "/"; "%"];
               |] 
 	     )
 	     primary);
@@ -203,7 +203,7 @@ module Stmt =
       | "write" "(" e:!(Expr.parse) ")" {Write e}
       | x:IDENT ":=" e:!(Expr.parse)    {Assign (x, e)}
       | %"skip"                          {Skip}
-      | %"if" e:!(Expr.parse) %"then" t_stmt:!(parse)
+      | %"if" e:!(Expr.parse) %"then" t_stmt:parse
         elif_part:(%"elif" !(Expr.parse) %"then" parse)*
         else_part:(%"else" parse)?
         %"fi" {If (e, t_stmt, parse_elif_else elif_part else_part)}
