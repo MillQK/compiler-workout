@@ -50,15 +50,10 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | "nz" -> z <> 0
     | "z" -> z == 0
     in eval env (cstack, stack', c) (if is_jump then (env#labeled l) else prg')
-  | BEGIN (_, args, locals) ->
-    let rec fun_init_state state = function
-      | arg::args, el::stk ->
-        let n_state, n_stack = fun_init_state state (args, stk) in
-        State.update arg el n_state, n_stack
-      | [], stk -> state, stk
-    in
-    let stt, stk = fun_init_state (State.enter st (args @ locals)) (args, stack) in
-    eval env (cstack, stk, (stt, i, o)) prg'
+  | BEGIN (_, args, local_vars) ->
+    let init_val = fun x ((v :: stack), st) -> (stack, State.update x v st) in
+    let (stack', st') = List.fold_right init_val args (stack, State.enter st (args @ local_vars)) in
+    eval env (cstack, stack', (st', i, o)) prg'
   | CALL (f_name, _, _) -> (
     eval env ((prg', st)::cstack, stack, c) (env#labeled f_name)
     )
