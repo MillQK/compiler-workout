@@ -124,18 +124,10 @@ let compile env code =
 	          (env', [Mov (L n, s)])               
 	        | LD x ->
              let s, env' = (env#global x)#allocate in
-             env',
-	          (match s with
-	          | S _ | M _ -> [Mov ((env'#loc x), eax); Mov (eax, s)]
-	          | _         -> [Mov ((env'#loc x), s)]
-	          )	        
+             env', [Mov (env'#loc x, eax); Mov (eax, s)]       
           | ST x ->
             let s, env' = (env#global x)#pop in
-            env',
-            (match s with
-              | S _ | M _ -> [Mov (s, eax); Mov (eax, env'#loc x)]
-              | _         -> [Mov (s, (env'#loc x))]
-            )
+            env', [Mov (s, eax); Mov (eax, env'#loc x)]
           | BINOP op ->
 	          let x, y, env' = env#pop2 in
              env'#push y,
@@ -207,7 +199,7 @@ let compile env code =
                   Meta (Printf.sprintf "\t.set %s, %d" env#lsize (env#allocated * word_size))]
           | RET wo_ret ->
             if wo_ret
-            then let v, env = env#pop in env, [Mov (v, eax); Jmp env#epilogue]
+            then let v, n_env = env#pop in env, [Mov (v, eax); Jmp n_env#epilogue]
             else env, [Jmp env#epilogue]
           | CALL (f_name, param_count, wo_ret) ->
             let pushed = List.map (fun x -> Push x) env#live_registers in
@@ -222,7 +214,7 @@ let compile env code =
                        push_args env ((Push x)::accum) (n - 1)
                 in 
                 let env, pushed_args = push_args env [] param_count in
-                env, pushed @ pushed_args @ [Call f_name; Binop ("+", L (param_count * word_size), esp)] @ poped
+                env, pushed @ (List.rev pushed_args) @ [Call f_name; Binop ("+", L (param_count * word_size), esp)] @ poped
             in
             (if wo_ret then env, code else (let r, env = env#allocate in env, code @ [Mov (eax, r)]))
         in

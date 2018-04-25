@@ -139,5 +139,5 @@ let rec compile_stmt = function
 let rec compile_def (f_name, (f_args, f_locals, f_body)) = 
 [LABEL (f_name); BEGIN (f_name, f_args, f_locals)] @ compile_stmt f_body @ [END]
 
-let rec compile (defs, p) = [LABEL "Lmain"] @ compile_stmt p @ [END] @ List.concat (List.map compile_def defs)
+let rec compile (defs, p) = compile_stmt p @ [END] @ List.concat (List.map compile_def defs)
 

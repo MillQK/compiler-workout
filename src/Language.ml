@@ -131,10 +131,10 @@ module Expr =
 	     primary);
       
       primary:
-        n:DECIMAL {Const n}
+        f_name:IDENT -"(" args:!(Util.list0)[parse] -")" { Call (f_name, args) }
+      |  n:DECIMAL {Const n}
       | x:IDENT   {Var x}
-      | -"(" parse -")"
-      | f_name:IDENT -"(" args:!(Util.list0)[parse] -")" { Call (f_name, args) }
+      | -"(" parse -")" 
     )
     
   end
