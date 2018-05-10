@@ -56,8 +56,8 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
   | CJMP (cond, l) ->
     let z::stack' = stack in
     let is_jump = match cond with
-    | "nz" -> z <> 0
-    | "z" -> z == 0
+    | "nz" -> Value.to_int z <> 0
+    | "z" -> Value.to_int z == 0
     in eval env (cstack, stack', c) (if is_jump then (env#labeled l) else prg')
   | BEGIN (_, args, local_vars) ->
     let init_val = fun x ((v :: stack), st) -> (stack, State.update x v st) in
@@ -132,8 +132,6 @@ let rec compile_expr = function
 
 let rec compile_stmt = function
 | Stmt.Seq (s1, s2)  -> (compile_stmt s1) @ (compile_stmt s2)
-| Stmt.Read x        -> [READ; ST x]
-| Stmt.Write e       -> (compile_expr e) @ [WRITE]
 | Stmt.Assign (x, [], e) -> (compile_expr e) @ [ST x]
 | Stmt.Assign (x, idxs, e) -> List.flatten (List.map compile_expr (idxs @ [e])) @ [STA (x, List.length idxs)]
 | Stmt.Skip -> []

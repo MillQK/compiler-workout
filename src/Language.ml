@@ -29,8 +29,10 @@ module Value =
     let of_string s = String s
     let of_array  a = Array  a
 
+    let rec list_init i n f = if i >= n then [] else (f i) :: (list_init (i + 1) n f) 
+
     let update_string s i x = String.init (String.length s) (fun j -> if j = i then x else s.[j])
-    let update_array  a i x = List.init   (List.length a)   (fun j -> if j = i then x else List.nth a j)
+    let update_array  a i x = list_init 0 (List.length a)   (fun j -> if j = i then x else List.nth a j)
 
   end
        
@@ -174,14 +176,15 @@ module Expr =
     and eval_list env conf xs =
       let vs, (st, i, o, _) =
         List.fold_left
-          (fun (acc, conf) x ->
-             let (_, _, _, Some v) as conf = eval env conf x in
-             v::acc, conf
+          (
+            fun (acc, conf) x ->
+              let (_, _, _, Some v) as conf = eval env conf x in
+              v::acc, conf
           )
           ([], conf)
           xs
       in
-      (st, i, o, List.rev vs);
+      (st, i, o, List.rev vs)
          
     (* Expression parser. You can use the following terminals:
 
@@ -259,17 +262,15 @@ module Stmt =
     let rec eval env ((st, i, o, r) as conf) k stmt = 
       let seq x = function Skip -> x | y -> Seq(x, y) in
       match stmt with
-      | Read    x       -> (match i with z::i' -> (eval env (State.update x z st, i', o, r) Skip k) | _ -> failwith "Unexpected end of input")
-      | Write   e       -> eval env (let (st, i, o, Some v) = Expr.eval env conf e in (st, i, o @ [v], r)) Skip k
       | Assign (x, idxs, e)   -> 
         let (st, i, o, idxs) = Expr.eval_list env conf idxs in
         let (st, i, o, Some v) = Expr.eval env (st, i, o, None) e in
         eval env (update st x v idxs, i, o, None) Skip k
       | Seq    (s1, s2) -> eval env conf (seq s2 k) s1
       | Skip            -> (match k with Skip -> conf | _ -> eval env conf Skip k)
-      | If (expr, t_stmt, f_stmt) -> let (_, _, _, Some v) = Expr.eval env conf expr in eval env conf k (if v <> 0 then t_stmt else f_stmt)
+      | If (expr, t_stmt, f_stmt) -> let (_, _, _, Some v) = Expr.eval env conf expr in eval env conf k (if (Value.to_int v) <> 0 then t_stmt else f_stmt)
       | While (expr, w_stmt) -> let (_, _, _, Some v) = Expr.eval env conf expr in
-                                if v <> 0
+                                if (Value.to_int v) <> 0
                                 then eval env conf (seq stmt k) w_stmt
                                 else eval env conf Skip k
       | Repeat (r_stmt, expr) -> eval env conf (seq (While (Expr.Binop ("==", expr, Expr.Const 0), r_stmt)) k) r_stmt
@@ -296,9 +297,7 @@ module Stmt =
       function_args: head:!(Expr.parse) tail:((-"," !(Expr.parse))* ) { head :: tail } | empty { [] };
 
       stmt:
-        "read" "(" x:IDENT ")"          {Read x}
-      | "write" "(" e:!(Expr.parse) ")" {Write e}
-      | x:IDENT assgnCall: (
+      x:IDENT assgnCall: (
           idx:(-"[" !(Expr.parse) -"]")* ":=" e:!(Expr.parse)    {Assign (x, idx, e)}
           | "(" args:!(Util.list0)[Expr.parse] ")" {Call (x, args)}
         ) {assgnCall}

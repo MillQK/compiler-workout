@@ -113,12 +113,6 @@ let compile env code =
     | instr :: scode' ->
         let env', code' =
           match instr with
-          | READ ->
-             let s, env' = env#allocate in
-             (env', [Call "Lread"; Mov (eax, s)])               
-          | WRITE ->
-             let s, env' = env#pop in
-             (env', [Push s; Call "Lwrite"; Pop eax])
   	      | CONST n ->
              let s, env' = env#allocate in
 	          (env', [Mov (L n, s)])               
@@ -226,8 +220,10 @@ let compile env code =
 (* A set of strings *)           
 module S = Set.Make (String)
 
+let rec list_init i n f = if i >= n then [] else (f i) :: (list_init (i + 1) n f) 
+
 (* Environment implementation *)
-let make_assoc l = List.combine l (List.init (List.length l) (fun x -> x))
+let make_assoc l = List.combine l (list_init 0 (List.length l) (fun x -> x))
                      
 class env =
   object (self)
