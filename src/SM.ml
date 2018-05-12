@@ -63,8 +63,10 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     let init_val = fun x ((v :: stack), st) -> (stack, State.update x v st) in
     let (stack', st') = List.fold_right init_val args (stack, State.enter st (args @ local_vars)) in
     eval env (cstack, stack', (st', i, o)) prg'
-  | CALL (f_name, _, _) -> (
-    eval env ((prg', st)::cstack, stack, c) (env#labeled f_name)
+  | CALL (f_name, n, p) -> (
+    if env#is_label f_name
+    then eval env ((prg', st)::cstack, stack, c) (env#labeled f_name) 
+    else eval env (env#builtin conf f_name n p) prg'
     )
   | END | RET _ -> (
     match cstack with
@@ -127,7 +129,7 @@ let rec compile_expr = function
 | Expr.Binop (op, x, y) -> (compile_expr x) @ (compile_expr y) @ [BINOP op]
 | Expr.Call (f_name, args) -> List.concat (List.map compile_expr args) @ [CALL (f_name, List.length args, false)]
 | Expr.Array xs -> List.flatten (List.map compile_expr xs) @ [CALL ("$array", List.length xs, false)]
-| Expr.Elem (ar, idx) -> compile_expr idx @ compile_expr ar @ [CALL ("$elem", 2, false)]
+| Expr.Elem (ar, idx) -> compile_expr ar @ compile_expr idx @ [CALL ("$elem", 2, false)]
 | Expr.Length e -> compile_expr e @ [CALL ("$length", 1, false)]
 
 let rec compile_stmt = function
