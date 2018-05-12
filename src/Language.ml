@@ -168,7 +168,7 @@ module Expr =
         env#definition env "$elem" vars (st, i, o, None)
       | Call (f_name, args) ->
         let (st, i, o, v_args) = eval_list env conf args in
-        env#definition env f_name (List.rev v_args) (st, i, o, None)
+        env#definition env f_name v_args (st, i, o, None)
       | Length exp ->
         let (st, i, o, Some v) = eval env conf exp in 
         env#definition env "$length" [v] (st, i, o, None)
