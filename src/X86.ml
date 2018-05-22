@@ -90,6 +90,22 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
+let char_to_int ch = match ch with
+  | ch when ch <= 'Z' -> Char.code ch - 64
+  | '_' -> 53
+  | ch -> Char.code ch - 70
+
+let rec compute_int tag tag_len accum idx = 
+  if (idx >= tag_len) then
+    accum
+  else
+    compute_int tag tag_len ((accum lsl 6) lor char_to_int tag.[idx]) (idx + 1)  
+
+let comp_tag tag = 
+  let tag_len = String.length tag in
+  let sub_tag = String.sub tag 0 (if tag_len < 5 then tag_len else 5) in
+  compute_int sub_tag tag_len 0 0
+
 let compile env code =
   let suffix = function
   | "<"  -> "l"
@@ -145,6 +161,8 @@ let compile env code =
              let l, env = env#allocate in
              let env, call = call env ".string" 1 false in
              (env, Mov (M ("$" ^ s), l) :: call)
+          | SEXP (tag, idx) -> let env, code = call env ".sexp" (idx + 1) true in
+            env, [Push (L (comp_tag tag))] @ code
              
 	  | LD x ->
              let s, env' = (env#global x)#allocate in
@@ -263,9 +281,10 @@ module S = Set.Make (String)
 (* A map indexed by strings *)
 module M = Map.Make (String)
 
+let rec list_init i n f = if i >= n then [] else (f i) :: (list_init (i + 1) n f) 
 (* Environment implementation *)
-let make_assoc l = List.combine l (List.init (List.length l) (fun x -> x))
-                     
+let make_assoc l = List.combine l (list_init 0 (List.length l) (fun x -> x))
+                   
 class env =
   object (self)
     val globals     = S.empty (* a set of global variables         *)
